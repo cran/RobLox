@@ -24,7 +24,7 @@ rlOptIC(r, mean = 0, sd = 1, bUp = 1000, computeIC = TRUE)
 }
 \value{
   If 'computeIC' is 'TRUE' an object of class \code{"ContIC"} is returned, 
-  otherwise a list of Lagrane multipliers
+  otherwise a list of Lagrange multipliers
   \item{A}{ standardizing constant }
   \item{a}{ centering constant; always '= 0' is this symmetric setup }
   \item{b}{ optimal clipping bound }
@@ -37,7 +37,7 @@ rlOptIC(r, mean = 0, sd = 1, bUp = 1000, computeIC = TRUE)
 }
 \author{Matthias Kohl \email{Matthias.Kohl@stamats.de}}
 %\note{}
-\seealso{\code{\link[ROptEst]{ContIC-class}}, \code{\link{roblox}}}
+\seealso{\code{\link[RobAStBase]{ContIC-class}}, \code{\link{roblox}}}
 \examples{
 IC1 <- rlOptIC(r = 0.1)
 distrExOptions("ErelativeTolerance" = 1e-12)

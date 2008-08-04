@@ -1,257 +1,772 @@
 ###############################################################################
-# computation of radius-minimax IC
+## computation of radius-minimax IC
+## using predefined functions included in "sysdata.rda"
 ###############################################################################
-.getlsInterval <- function(r, rlo, rup, mean, sd, delta, A.loc.start, 
-                           a.sc.start, A.sc.start, bUp, itmax){    
-    Ab <- rlsOptIC.AL(r = r, mean = mean, sd = sd, A.loc.start = A.loc.start, 
-                      a.sc.start = a.sc.start, A.sc.start = A.sc.start, 
-                      bUp = bUp, delta = delta, itmax = itmax, computeIC = FALSE)
-
-    if(rlo == 0){
-        efflo <- (sum(diag(Ab$A)) - Ab$b^2*r^2)/(1.5*sd^2)        
+.getlsInterval <- function(r, rlo, rup){
+    if(r > 10){
+        b <- 1.618128043
+        const <- 1.263094656
+        A2 <- b^2*(1+r^2)/(1+const)
+        A1 <- const*A2
     }else{
-        Ablo <- rlsOptIC.AL(r = rlo, mean = mean, sd = sd, A.loc.start = A.loc.start, 
-                            a.sc.start = a.sc.start, A.sc.start = A.sc.start, 
-                            bUp = bUp, delta = delta, itmax = itmax, computeIC = FALSE)
-        efflo <- (sum(diag(Ab$A)) - Ab$b^2*(r^2 - rlo^2))/sum(diag(Ablo$A))
+        A1 <- .getA1.locsc(r)
+        A2 <- .getA2.locsc(r)
+        b <- .getb.locsc(r)
     }
 
-    Abup <- rlsOptIC.AL(r = rup, mean = mean, sd = sd, A.loc.start = A.loc.start, 
-                        a.sc.start = a.sc.start, A.sc.start = A.sc.start, 
-                        bUp = bUp, delta = delta, itmax = itmax, computeIC = FALSE)
-    effup <- (sum(diag(Ab$A)) - Ab$b^2*(r^2 - rup^2))/sum(diag(Abup$A))
-    
-    return(effup-efflo)
-}
-.getlInterval <- function(r, rlo, rup, mean, sd, bUp){    
-    Ab <- rlOptIC(r = r, mean = mean, sd = sd, bUp = bUp, computeIC = FALSE)
-
     if(rlo == 0){
-        efflo <- (Ab$A - Ab$b^2*r^2)/sd^2
+        efflo <- (A1 + A2 - b^2*r^2)/1.5
     }else{
-        Ablo <- rlOptIC(r = rlo, mean = mean, sd = sd, bUp = bUp, computeIC = FALSE)
-        efflo <- (Ab$A - Ab$b^2*(r^2 - rlo^2))/Ablo$A
+        A1lo <- .getA1.locsc(rlo)
+        A2lo <- .getA2.locsc(rlo)
+        efflo <- (A1 + A2 - b^2*(r^2 - rlo^2))/(A1lo + A2lo)
     }
 
-    Abup <- rlOptIC(r = rup, mean = mean, sd = sd, bUp = bUp, computeIC = FALSE)
-    effup <- (Ab$A - Ab$b^2*(r^2 - rup^2))/Abup$A
-    
-    return(effup-efflo)
-}
-.getsInterval <- function(r, rlo, rup, mean, sd, delta, bUp, itmax){    
-    Ab <- rsOptIC(r = r, mean = mean, sd = sd, bUp = bUp, delta = delta, 
-                  itmax = itmax, computeIC = FALSE)
-
-    if(rlo == 0){
-        efflo <- (Ab$A - Ab$b^2*r^2)/(0.5*sd^2)
+    if(rup > 10){
+        bup <- 1.618128043
+        const.up <- 1.263094656
+        A2up <- bup^2*(1+rup^2)/(1+const.up)
+        A1up <- const.up*A2up
+        effup <- (A1 + A2 - b^2*(r^2 - rup^2))/(A1up + A2up)
     }else{
-        Ablo <- rsOptIC(r = rlo, mean = mean, sd = sd, bUp = bUp, delta = delta, 
-                        itmax = itmax, computeIC = FALSE)
-        efflo <- (Ab$A - Ab$b^2*(r^2 - rlo^2))/Ablo$A
+        A1up <- .getA1.locsc(rup)
+        A2up <- .getA2.locsc(rup)
+        effup <- (A1 + A2 - b^2*(r^2 - rup^2))/(A1up + A2up)
     }
 
-    Abup <- rsOptIC(r = rup, mean = mean, sd = sd, bUp = bUp, delta = delta, 
-                      itmax = itmax, computeIC = FALSE)
-    effup <- (Ab$A - Ab$b^2*(r^2 - rup^2))/Abup$A
-    
     return(effup-efflo)
 }
-###############################################################################
-# optimally robust estimator for normal location and/or scale
-###############################################################################
-roblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est = "ksMD", 
-                   tol = 1e-6, A.loc.start = 1, a.sc.start = 0, A.sc.start = 0.5, 
-                   bUp = 1000, itmax = 100, returnIC = FALSE){
+.getlInterval <- function(r, rlo, rup){
+    if(r > 10){
+        b <- sqrt(pi/2)
+        A <- b^2*(1+r^2)
+    }else{
+        A <- .getA.loc(r)
+        b <- .getb.loc(r)
+    }
 
+    if(rlo == 0){
+        efflo <- A - b^2*r^2
+    }else{
+        Alo <- .getA.loc(rlo)
+        efflo <- (A - b^2*(r^2 - rlo^2))/Alo
+    }
+
+    if(rup > 10){
+        Aup <- pi/2*(1+rup^2)
+        effup <- (A - b^2*(r^2 - rup^2))/Aup
+    }else{
+        Aup <- .getA.loc(rup)
+        effup <- (A - b^2*(r^2 - rup^2))/Aup
+    }
+
+    return(effup-efflo)
+}
+.getsInterval <- function(r, rlo, rup){
+    if(r > 10){
+        b <- 1/(4*qnorm(0.75)*dnorm(qnorm(0.75)))
+        A <- b^2*(1+r^2)
+    }else{
+        A <- .getA.sc(r)
+        b <- .getb.sc(r)
+    }
+
+    if(rlo == 0){
+        efflo <- (A - b^2*r^2)/0.5
+    }else{
+        Alo <- .getA.sc(rlo)
+        efflo <- (A - b^2*(r^2 - rlo^2))/Alo
+    }
+
+    if(rup > 10){
+        bup <- 1/(4*qnorm(0.75)*dnorm(qnorm(0.75)))
+        Aup <- bup^2*(1+rup^2)
+        effup <- (A - b^2*(r^2 - rup^2))/Aup
+    }else{
+        Aup <- .getA.sc(rup)
+        effup <- (A - b^2*(r^2 - rup^2))/Aup
+    }
+
+    return(effup-efflo)
+}
+
+
+###############################################################################
+## computation of k-step construction
+###############################################################################
+.onestep.loc <- function(x, initial.est, A, b, sd){
+    u <- A*(x-initial.est)/sd^2
+    IC <- mean(u*pmin(1, b/abs(u)), na.rm = TRUE)
+    return(initial.est + IC)
+}
+.kstep.loc <- function(x, initial.est, A, b, sd, k){
+    est <- initial.est
+    for(i in 1:k){
+        est <- .onestep.loc(x = x, initial.est = est, A = A, b = b, sd = sd)
+    }
+    return(est)
+}
+.onestep.sc <- function(x, initial.est, A, a, b, mean){
+    v <- A*(((x-mean)/initial.est)^2-1)/initial.est - a
+    IC <- mean(v*pmin(1, b/abs(v)), na.rm = TRUE)
+    return(initial.est + IC)
+}
+.kstep.sc <- function(x, initial.est, A, a, b, mean, k){
+    est <- .onestep.sc(x = x, initial.est = initial.est, A = A, a = a, b = b, mean = mean)
+    if(k > 1){
+        for(i in 2:k){
+            A <- est^2*A/initial.est^2
+            a <- est*a/initial.est
+            b <- est*b/initial.est
+            initial.est <- est
+            est <- .onestep.sc(x = x, initial.est = est, A = A, a = a, b = b, mean = mean)
+        }
+    }
+    A <- est^2*A/initial.est^2
+    a <- est*a/initial.est
+    b <- est*b/initial.est
+
+    return(list(est = est, A = A, a = a, b = b))
+}
+.onestep.locsc <- function(x, initial.est, A1, A2, a, b){
+    mean <- initial.est[1]
+    sd <- initial.est[2]
+    u <- A1*(x-mean)/sd^2
+    v <- A2*(((x-mean)/sd)^2-1)/sd - a[2]
+    w <- pmin(1, b/sqrt(u^2 + v^2))
+    IC <- c(mean(u*w, na.rm = TRUE), mean(v*w, na.rm = TRUE))
+    return(initial.est + IC)
+}
+.kstep.locsc <- function(x, initial.est, A1, A2, a, b, mean, k){
+    est <- .onestep.locsc(x = x, initial.est = initial.est, A1 = A1, A2 = A2, a = a, b = b)
+    if(k > 1){
+        for(i in 2:k){
+            A1 <- est[2]^2*A1/initial.est[2]^2
+            A2 <- est[2]^2*A2/initial.est[2]^2
+            a <- est[2]*a/initial.est[2]
+            b <- est[2]*b/initial.est[2]
+            initial.est <- est
+            est <- .onestep.locsc(x = x, initial.est = est, A1 = A1, A2 = A2, a = a, b = b)
+        }
+    }
+    A1 <- est[2]^2*A1/initial.est[2]^2
+    A2 <- est[2]^2*A2/initial.est[2]^2
+    a <- est[2]*a/initial.est[2]
+    b <- est[2]*b/initial.est[2]
+    a1 <- A1/est[2]^2
+    a3 <- A2/est[2]^2
+    a2 <- a[2]/est[2]/a3 + 1
+    asVar <- est[2]^2*.ALrlsVar(b = b, a1 = a1, a2 = a2, a3 = a3)
+
+    return(list(est = est, A1 = A1, A2 = A2, a = a, b = b, asvar = asVar))
+}
+
+
+###############################################################################
+## optimally robust estimator for normal location and/or scale
+###############################################################################
+roblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1, 
+                   returnIC = FALSE){
+    es.call <- match.call()
     if(missing(x))
         stop("'x' is missing with no default")
-    if(missing(eps) & missing(eps.lower) & missing(eps.upper)){
+    if(!is.numeric(x)){
+        if(is.data.frame(x))
+            x <- data.matrix(x)
+        else
+            x <- as.matrix(x)
+        if(!is.matrix(x))
+            stop("'x' has to be a numeric vector resp. a matrix or data.frame
+                  with one row resp. column/(numeric) variable")
+        if(ncol(x) > 1 & nrow(x) > 1)
+            stop("number of rows and columns/variables > 1. Please, do use 'rowRoblox'
+                  resp. 'colRoblox'.")
+    }
+    if(missing(eps) && missing(eps.lower) && missing(eps.upper)){
         eps.lower <- 0
         eps.upper <- 0.5
     }
     if(missing(eps)){
-        if(!missing(eps.lower) & missing(eps.upper))
+        if(!missing(eps.lower) && missing(eps.upper))
             eps.upper <- 0.5
-        if(missing(eps.lower) & !missing(eps.upper))
+        if(missing(eps.lower) && !missing(eps.upper))
             eps.lower <- 0
+        if(length(eps.lower) != 1 || length(eps.upper) != 1)
+            stop("'eps.lower' and 'eps.upper' have to be of length 1")
         if(!is.numeric(eps.lower) || !is.numeric(eps.upper) || eps.lower >= eps.upper) 
             stop("'eps.lower' < 'eps.upper' is not fulfilled")
         if((eps.lower < 0) || (eps.upper > 0.5))
             stop("'eps.lower' and 'eps.upper' have to be in [0, 0.5]")
     }else{
+        if(length(eps) != 1)
+            stop("'eps' has to be of length 1")
         if(eps == 0)
             stop("'eps = 0'! => use functions 'mean' and 'sd' for estimation")
         if((eps < 0) || (eps > 0.5))
             stop("'eps' has to be in (0, 0.5]")
     }
-    if((initial.est != "ksMD") && (initial.est != "med"))
-        stop("invalid 'initial.est'")
-    
-    if(missing(mean) & missing(sd)){
-        if(!is.numeric(A.loc.start) || !is.numeric(a.sc.start) || !is.numeric(A.sc.start))
-            stop("Starting values 'A.loc.start', 'a.sc.start' and 'A.sc.start' have to be numeric")
+    if(!is.integer(k))
+        k <- as.integer(k)
+    if(k < 1){
+        stop("'k' has to be some positive integer value")
+    }
+    if(length(k) != 1){
+        stop("'k' has to be of length 1")
+    }
 
-        if(initial.est == "ksMD"){
-            KSdist <- function(param, x){
-                if(param[2] <= 0) return(Inf)
-                return(ks.test(x, "pnorm", mean = param[1], sd = param[2])$statistic)
-            }
-            res <- optim(c(0, 1), f = KSdist, method = "Nelder-Mead", 
-                         control=list(reltol = tol), x = x)$par
-            mean <- res[1]
-            sd <- res[2]
-        }
-        if(initial.est == "med"){
+    if(missing(mean) && missing(sd)){
+        if(missing(initial.est)){
             mean <- median(x, na.rm = TRUE)
             sd <- mad(x, na.rm = TRUE)
+            if(sd == 0)
+                stop("'mad(x, na.rm = TRUE) == 0' => cannot compute a valid initial estimate, 
+                      please specify one via 'initial.est'")
+        }else{
+            if(!is.numeric(initial.est) || length(initial.est) != 2)
+              stop("'initial.est' needs to be a numeric vector of length 2 or missing")
+            mean <- initial.est[1]
+            sd <- initial.est[2]
+            if(sd <= 0)
+                stop("initial estimate for scale <= 0 which is no valid scale estimate")
         }
 
         if(!missing(eps)){
-            IC1 <- rlsOptIC.AL(r = sqrt(length(x))*eps, mean = mean, sd = sd, 
-                               A.loc.start = A.loc.start, a.sc.start = a.sc.start, 
-                               A.sc.start = A.sc.start, bUp = bUp, delta = tol, 
-                               itmax = itmax)
-            Infos(IC1) <- matrix(c("roblox", 
-                                   "optimally robust IC for AL estimators and 'asMSE'"), 
-                                 ncol = 2, dimnames = list(NULL, c("method", "message")))
-            robEst <- oneStepEstimator(x, IC1, c(mean, sd))
-            if(returnIC)
-                return(list(optIC = IC1, mean = robEst[1], sd = robEst[2]))
-            else
-                return(list(mean = robEst[1], sd = robEst[2]))
+            r <- sqrt(length(x))*eps
+            if(r > 10){
+                b <- sd*1.618128043
+                const <- 1.263094656
+                A2 <- b^2*(1+r^2)/(1+const)
+                A1 <- const*A2
+                a <- c(0, -0.6277527697*A2/sd)
+                mse <- A1 + A2
+            }else{
+                A1 <- sd^2*.getA1.locsc(r)
+                A2 <- sd^2*.getA2.locsc(r)
+                a <- sd*c(0, .geta.locsc(r))
+                b <- sd*.getb.locsc(r)
+                mse <- A1 + A2
+            }
+            robEst <- .kstep.locsc(x = x, initial.est = c(mean, sd), A1 = A1, A2 = A2, a = a, b = b, k = k)
+            names(robEst$est) <- c("mean", "sd")
+            Info.matrix <- matrix(c("roblox", 
+                                    paste("optimally robust estimate for contamination 'eps' =", round(eps, 3),
+                                          "and 'asMSE'")),
+                                  ncol = 2, dimnames = list(NULL, c("method", "message")))
+            if(returnIC){
+                w <- new("HampelWeight")
+                clip(w) <- robEst$b
+                cent(w) <- robEst$a/robEst$A2
+                stand(w) <- diag(c(robEst$A1, robEst$A2))
+                weight(w) <- getweight(w, neighbor = ContNeighborhood(radius = r), 
+                                       biastype = symmetricBias(), 
+                                       normW = NormType())
+                mse <- robEst$A1 + robEst$A2
+                modIC <- function(L2Fam, IC){
+                    ICL2Fam <- eval(CallL2Fam(IC))
+                    if(is(L2Fam, "L2LocationScaleFamily") && is(distribution(L2Fam), "Norm")){
+                        sdneu <- main(L2Fam)[2]
+                        sdalt <- main(ICL2Fam)[2]
+                        r <- neighborRadius(IC)
+                        w <- weight(IC)
+                        clip(w) <- sdneu*clip(w)/sdalt
+                        cent(w) <- sdalt*cent(w)/sdneu
+                        stand(w) <- sdneu^2*stand(w)/sdalt^2
+                        weight(w) <- getweight(w, neighbor = ContNeighborhood(radius = r), 
+                                      biastype = biastype(IC), 
+                                      normW = normtype(IC))
+                        A <- sdneu^2*stand(IC)/sdalt^2
+                        b <- sdneu*clip(IC)/sdalt
+                        a <- sdneu*cent(IC)/sdalt
+                        mse <- sum(diag(A))
+                        a1 <- A[1, 1]/sdneu^2
+                        a3 <- A[2, 2]/sdneu^2
+                        a2 <- a[2]/sdneu/a3 + 1
+                        asVar <- sdneu^2*.ALrlsVar(b = b/sdneu, a1 = a1, a2 = a2, a3 = a3)
+                        res <- list(A = A, a = sdneu*cent(IC)/sdalt, b = b, d = NULL,
+                                    risk = list(asMSE = mse, asBias = b, 
+                                                trAsCov = mse - r^2*b^2,
+                                                asCov = asVar), info = Infos(IC), w = w,
+                                    normtype = normtype(IC), biastype = biastype(IC),
+                                    modifyIC = modifyIC(IC))
+                        IC <- generateIC(neighbor = ContNeighborhood(radius = r),
+                                        L2Fam = L2Fam, res = res)
+                        addInfo(IC) <- c("modifyIC", "The IC has been modified")
+                        addInfo(IC) <- c("modifyIC", "The entries in 'Infos' may be wrong")
+                        return(IC)
+                    }else{
+                        makeIC(L2Fam, IC)
+                    }
+                }
+                L2Fam <- substitute(NormLocationScaleFamily(mean = m1, sd = s1), 
+                                    list(m1 = robEst$est[1], s1 = robEst$est[2]))
+                IC1 <- generateIC(neighbor = ContNeighborhood(radius = r), 
+                                  L2Fam = eval(L2Fam), 
+                                  res = list(A = diag(c(robEst$A1, robEst$A2)), a = robEst$a, 
+                                      b = robEst$b, d = NULL, 
+                                      risk = list(asMSE = mse, asBias = robEst$b, 
+                                                  trAsCov = mse - r^2*robEst$b^2,
+                                                  asCov = robEst$asVar), 
+                                      info = c("roblox", "optimally robust IC for AL estimators and 'asMSE'"),
+                                      w = w, biastype = symmetricBias(), normtype = NormType(),
+                                      modifyIC = modIC))
+                return(new("kStepEstimate", name = "Optimally robust estimate", 
+                           estimate.call = es.call, estimate = robEst$est, 
+                           samplesize = length(x), asvar = robEst$asvar,
+                           asbias = r*robEst$b, steps = k, pIC = IC1, Infos = Info.matrix))
+            }else
+                return(new("kStepEstimate", name = "Optimally robust estimate", 
+                           estimate.call = es.call, estimate = robEst$est, 
+                           samplesize = length(x), asvar = robEst$asvar,
+                           asbias = r*robEst$b, steps = k, pIC = NULL, Infos = Info.matrix))
         }else{
             sqrtn <- sqrt(length(x))
             rlo <- sqrtn*eps.lower
             rup <- sqrtn*eps.upper
-            r <- uniroot(.getlsInterval, lower = rlo+1e-5, upper = rup, 
-                         tol = .Machine$double.eps^0.25, rlo = rlo, rup = rup,
-                         mean = mean, sd = sd, delta = tol, A.loc.start = A.loc.start, 
-                         a.sc.start = a.sc.start, A.sc.start = A.sc.start,
-                         bUp = bUp, itmax = itmax)$root
-            IC1 <- rlsOptIC.AL(r = r, mean = mean, sd = sd, 
-                               A.loc.start = A.loc.start, a.sc.start = a.sc.start, 
-                               A.sc.start = A.sc.start, bUp = bUp, delta = tol, 
-                               itmax = itmax)
-            if(rlo == 0){
-                ineff <- (sum(diag(stand(IC1))) - clip(IC1)^2*r^2)/(1.5*sd^2)        
+            if(rlo > 10){
+                r <- (rlo + rup)/2
             }else{
-                Ablo <- rlsOptIC.AL(r = rlo, mean = mean, sd = sd, A.loc.start = A.loc.start, 
-                                    a.sc.start = a.sc.start, A.sc.start = A.sc.start, 
-                                    bUp = bUp, delta = tol, itmax = itmax, computeIC = FALSE)
-                ineff <- (sum(diag(stand(IC1))) - clip(IC1)^2*(r^2 - rlo^2))/sum(diag(Ablo$A))
+                r <- uniroot(.getlsInterval, lower = rlo+1e-8, upper = rup, 
+                             tol = .Machine$double.eps^0.25, rlo = rlo, rup = rup)$root
             }
-            Infos(IC1) <- matrix(c(rep("roblox", 3), 
-                             paste("radius-minimax IC for radius interval [", 
-                               round(rlo, 3), ", ", round(rup, 3), "]", sep = ""),
-                             paste("least favorable radius: ", round(r, 3), sep = ""),
-                             paste("maximum MSE-inefficiency: ", round(ineff, 3), sep = "")), 
-                             ncol = 2, dimnames = list(NULL, c("method", "message")))
-            robEst <- oneStepEstimator(x, IC1, c(mean, sd))
-            if(returnIC)
-                return(list(optIC = IC1, mean = robEst[1], sd = robEst[2]))
-            else
-                return(list(mean = robEst[1], sd = robEst[2]))
+            if(r > 10){
+                b <- sd*1.618128043
+                const <- 1.263094656
+                A2 <- b^2*(1+r^2)/(1+const)
+                A1 <- const*A2
+                a <- c(0, -0.6277527697*A2/sd)
+                mse <- A1 + A2
+            }else{
+                A1 <- sd^2*.getA1.locsc(r)
+                A2 <- sd^2*.getA2.locsc(r)
+                a <- sd*c(0, .geta.locsc(r))
+                b <- sd*.getb.locsc(r)
+                mse <- A1 + A2
+            }
+            if(rlo == 0){
+                ineff <- (A1 + A2 - b^2*r^2)/(1.5*sd^2)
+            }else{
+                if(rlo > 10){
+                    ineff <- 1
+                }else{
+                    A1lo <- sd^2*.getA1.locsc(rlo)
+                    A2lo <- sd^2*.getA2.locsc(rlo)
+                    ineff <- (A1 + A2 - b^2*(r^2 - rlo^2))/(A1lo + A2lo)
+                }
+            }
+            robEst <- .kstep.locsc(x = x, initial.est = c(mean, sd), A1 = A1, A2 = A2, a = a, b = b, k = k)
+            names(robEst$est) <- c("mean", "sd")
+            Info.matrix <- matrix(c(rep("roblox", 3), 
+                                  paste("radius-minimax estimate for contamination interval [", 
+                                    round(eps.lower, 3), ", ", round(eps.upper, 3), "]", sep = ""),
+                                  paste("least favorable contamination: ", round(r/sqrtn, 3), sep = ""),
+                                  paste("maximum MSE-inefficiency: ", round(ineff, 3), sep = "")), 
+                                  ncol = 2, dimnames = list(NULL, c("method", "message")))
+            if(returnIC){
+                w <- new("HampelWeight")
+                clip(w) <- robEst$b
+                cent(w) <- robEst$a/robEst$A2
+                stand(w) <- diag(c(robEst$A1, robEst$A2))
+                weight(w) <- getweight(w, neighbor = ContNeighborhood(radius = r), 
+                                       biastype = symmetricBias(), 
+                                       normW = NormType())
+                mse <- robEst$A1 + robEst$A2
+                modIC <- function(L2Fam, IC){
+                    ICL2Fam <- eval(CallL2Fam(IC))
+                    if(is(L2Fam, "L2LocationScaleFamily") && is(distribution(L2Fam), "Norm")){
+                        sdneu <- main(L2Fam)[2]
+                        sdalt <- main(ICL2Fam)[2]
+                        r <- neighborRadius(IC)
+                        w <- weight(IC)
+                        clip(w) <- sdneu*clip(w)/sdalt
+                        cent(w) <- sdalt*cent(w)/sdneu
+                        stand(w) <- sdneu^2*stand(w)/sdalt^2
+                        weight(w) <- getweight(w, neighbor = ContNeighborhood(radius = r), 
+                                      biastype = biastype(IC), 
+                                      normW = normtype(IC))
+                        A <- sdneu^2*stand(IC)/sdalt^2
+                        b <- sdneu*clip(IC)/sdalt
+                        a <- sdneu*cent(IC)/sdalt
+                        mse <- sum(diag(A))
+                        a1 <- A[1, 1]/sdneu^2
+                        a3 <- A[2, 2]/sdneu^2
+                        a2 <- a[2]/sdneu/a3 + 1
+                        asVar <- sdneu^2*.ALrlsVar(b = b/sdneu, a1 = a1, a2 = a2, a3 = a3)
+                        res <- list(A = A, a = sdneu*cent(IC)/sdalt, b = b, d = NULL,
+                                    risk = list(asMSE = mse, asBias = b, 
+                                                trAsCov = mse - r^2*b^2,
+                                                asCov = asVar), info = Infos(IC), w = w,
+                                    normtype = normtype(IC), biastype = biastype(IC),
+                                    modifyIC = modifyIC(IC))
+                        IC <- generateIC(neighbor = ContNeighborhood(radius = r),
+                                        L2Fam = L2Fam, res = res)
+                        addInfo(IC) <- c("modifyIC", "The IC has been modified")
+                        addInfo(IC) <- c("modifyIC", "The entries in 'Infos' may be wrong")
+                        return(IC)
+                    }else{
+                        makeIC(L2Fam, IC)
+                    }
+                }
+                L2Fam <- substitute(NormLocationScaleFamily(mean = m1, sd = s1), 
+                                    list(m1 = robEst$est[1], s1 = robEst$est[2]))
+                IC1 <- generateIC(neighbor = ContNeighborhood(radius = r), 
+                                  L2Fam = eval(L2Fam), 
+                                  res = list(A = diag(c(robEst$A1, robEst$A2)), a = robEst$a, 
+                                      b = robEst$b, d = NULL, 
+                                      risk = list(asMSE = mse, asBias = robEst$b, 
+                                                  trAsCov = mse - r^2*robEst$b^2,
+                                                  asCov = robEst$asvar), 
+                                      info = c("roblox", "optimally robust IC for AL estimators and 'asMSE'"),
+                                      w = w, biastype = symmetricBias(), normtype = NormType(),
+                                      modifyIC = modIC))
+                Infos(IC1) <- matrix(c(rep("roblox", 3), 
+                                      paste("radius-minimax IC for contamination interval [", 
+                                        round(eps.lower, 3), ", ", round(eps.upper, 3), "]", sep = ""),
+                                      paste("least favorable contamination: ", round(r/sqrtn, 3), sep = ""),
+                                      paste("maximum MSE-inefficiency: ", round(ineff, 3), sep = "")), 
+                                      ncol = 2, dimnames = list(NULL, c("method", "message")))
+                return(new("kStepEstimate", name = "Optimally robust estimate", 
+                           estimate.call = es.call, estimate = robEst$est, 
+                           samplesize = length(x), asvar = robEst$asvar,
+                           asbias = r*robEst$b, steps = k, pIC = IC1, Infos = Info.matrix))
+            }else
+                return(new("kStepEstimate", name = "Optimally robust estimate", 
+                           estimate.call = es.call, estimate = robEst$est, 
+                           samplesize = length(x), asvar = robEst$asvar,
+                           asbias = r*robEst$b, steps = k, pIC = NULL, Infos = Info.matrix))
         }
     }else{
         if(missing(mean)){
-            if(initial.est == "ksMD"){
-                KSdist.mean <- function(mean, x, sd){
-                    return(ks.test(x, "pnorm", mean = mean, sd = sd)$statistic)
-                }
-                mean <- optimize(f = KSdist.mean, interval = c(min(x), max(x)), 
-                            tol = tol, x = x, sd = sd)$minimum
+            if(length(sd) != 1)
+                stop("'sd' has length != 1")
+            if(sd <= 0)
+                stop("'sd' has to be positive")
+            if(missing(initial.est)){
+                mean <- median(x, na.rm = TRUE)
+            }else{
+                if(!is.numeric(initial.est) || length(initial.est) != 1)
+                    stop("'initial.est' needs to be a numeric vector of length 1 or missing")
+                mean <- initial.est
             }
-            if(initial.est == "med") mean <- median(x, na.rm = TRUE)
 
             if(!missing(eps)){
-                IC1 <- rlOptIC(r = sqrt(length(x))*eps, mean = mean, sd = sd, 
-                               bUp = bUp)
-                Infos(IC1) <- matrix(c("roblox", 
-                                       "optimally robust IC for AL estimators and 'asMSE'"), 
-                                     ncol = 2, dimnames = list(NULL, c("method", "message")))
-                robEst <- oneStepEstimator(x, IC1, mean)
-                if(returnIC)
-                    return(list(optIC = IC1, mean = robEst, sd = sd))
-                else
-                    return(list(mean = robEst, sd = sd))
+                r <- sqrt(length(x))*eps
+                if(r > 10){
+                    b <- sd*sqrt(pi/2)
+                    A <- b^2*(1+r^2)
+                }else{
+                    A <- sd^2*.getA.loc(r)
+                    b <- sd*.getb.loc(r)
+                }
+                robEst <- .kstep.loc(x = x, initial.est = mean, A = A, b = b, sd = sd, k = k)
+                names(robEst) <- "mean"
+                Info.matrix <- matrix(c("roblox", 
+                                        paste("optimally robust estimate for contamination 'eps' =", round(eps, 3),
+                                              "and 'asMSE'")),
+                                      ncol = 2, dimnames = list(NULL, c("method", "message")))
+                if(returnIC){
+                    w <- new("HampelWeight")
+                    clip(w) <- b
+                    cent(w) <- 0
+                    stand(w) <- as.matrix(A)
+                    weight(w) <- getweight(w, neighbor = ContNeighborhood(radius = r), 
+                                           biastype = symmetricBias(), 
+                                           normW = NormType())
+                    modIC <- function(L2Fam, IC){
+                        if(is(L2Fam, "L2LocationFamily") && is(distribution(L2Fam), "Norm")){
+                            CallL2New <- call("NormLocationFamily", 
+                                              mean = main(L2Fam))
+                            CallL2Fam(IC) <- CallL2New
+                            return(IC)
+                        }else{
+                            makeIC(L2Fam, IC)
+                        }
+                    }
+                    L2Fam <- substitute(NormLocationFamily(mean = m1, sd = s1), 
+                                        list(m1 = robEst, s1 = sd))
+                    IC1 <- generateIC(neighbor = ContNeighborhood(radius = r), 
+                                      L2Fam = eval(L2Fam), 
+                                      res = list(A = as.matrix(A), a = 0, b = b, d = NULL, 
+                                          risk = list(asMSE = A, asBias = b, asCov = A-r^2*b^2), 
+                                          info = c("roblox", "optimally robust IC for AL estimators and 'asMSE'"),
+                                          w = w, biastype = symmetricBias(), normtype = NormType(),
+                                          modifyIC = modIC))
+                    return(new("kStepEstimate", name = "Optimally robust estimate",
+                               estimate.call = es.call, estimate = robEst, 
+                               samplesize = length(x), asvar = as.matrix(A-r^2*b^2),
+                               asbias = r*b, steps = k, pIC = IC1, Infos = Info.matrix))
+                }else
+                    return(new("kStepEstimate", name = "Optimally robust estimate",
+                               estimate.call = es.call, estimate = robEst, 
+                               samplesize = length(x), asvar = as.matrix(A-r^2*b^2),
+                               asbias = r*b, steps = k, pIC = NULL, Infos = Info.matrix))
             }else{
                 sqrtn <- sqrt(length(x))
                 rlo <- sqrtn*eps.lower
                 rup <- sqrtn*eps.upper
-                r <- uniroot(.getlInterval, lower = rlo+1e-5, upper = rup, 
-                         tol = .Machine$double.eps^0.25, rlo = rlo, rup = rup,
-                         mean = mean, sd = sd, bUp = bUp)$root
-                IC1 <- rlOptIC(r = r, mean = mean, sd = sd, bUp = bUp)
-                if(rlo == 0){
-                    ineff <- (as.vector(stand(IC1)) - clip(IC1)^2*r^2)/sd^2
+                if(rlo > 10){ 
+                    r <- (rlo+rup)/2
                 }else{
-                    Ablo <- rlOptIC(r = rlo, mean = mean, sd = sd, bUp = bUp, computeIC = FALSE)
-                    ineff <- (as.vector(stand(IC1)) - clip(IC1)^2*(r^2 - rlo^2))/Ablo$A
+                    r <- uniroot(.getlInterval, lower = rlo+1e-8, upper = rup, 
+                                 tol = .Machine$double.eps^0.25, rlo = rlo, rup = rup)$root
                 }
-                Infos(IC1) <- matrix(c(rep("roblox", 3), 
-                             paste("radius-minimax IC for radius interval [", 
-                               round(rlo, 3), ", ", round(rup, 3), "]", sep = ""),
-                             paste("least favorable radius: ", round(r, 3), sep = ""),
-                             paste("maximum MSE-inefficiency: ", round(ineff, 3), sep = "")), 
-                             ncol = 2, dimnames = list(NULL, c("method", "message")))
-                robEst <- oneStepEstimator(x, IC1, mean)
-                if(returnIC)
-                    return(list(optIC = IC1, mean = robEst, sd = sd))
-                else
-                    return(list(mean = robEst, sd = sd))
+                if(r > 10){
+                    b <- sd*sqrt(pi/2)
+                    A <- b^2*(1+r^2)
+                }else{
+                    A <- sd^2*.getA.loc(r)
+                    b <- sd*.getb.loc(r)
+                }
+                if(rlo == 0){
+                    ineff <- (A - b^2*r^2)/sd^2
+                }else{
+                    if(rlo > 10){
+                        ineff <- 1
+                    }else{
+                        Alo <- sd^2*.getA.loc(rlo)
+                        ineff <- (A - b^2*(r^2 - rlo^2))/Alo
+                    }
+                }
+                robEst <- .kstep.loc(x = x, initial.est = mean, A = A, b = b, sd = sd, k = k)
+                names(robEst) <- "mean"
+                Info.matrix <- matrix(c(rep("roblox", 3), 
+                                      paste("radius-minimax estimate for contamination interval [", 
+                                        round(eps.lower, 3), ", ", round(eps.upper, 3), "]", sep = ""),
+                                      paste("least favorable contamination: ", round(r/sqrtn, 3), sep = ""),
+                                      paste("maximum MSE-inefficiency: ", round(ineff, 3), sep = "")), 
+                                      ncol = 2, dimnames = list(NULL, c("method", "message")))
+                if(returnIC){
+                    w <- new("HampelWeight")
+                    clip(w) <- b
+                    cent(w) <- 0
+                    stand(w) <- as.matrix(A)
+                    weight(w) <- getweight(w, neighbor = ContNeighborhood(radius = r), 
+                                       biastype = symmetricBias(), 
+                                       normW = NormType())
+                    modIC <- function(L2Fam, IC){
+                        if(is(L2Fam, "L2LocationFamily") && is(distribution(L2Fam), "Norm")){
+                            CallL2New <- call("NormLocationFamily", 
+                                              mean = main(L2Fam))
+                            CallL2Fam(IC) <- CallL2New
+                            return(IC)
+                        }else{
+                            makeIC(L2Fam, IC)
+                        }
+                    }
+                    L2Fam <- substitute(NormLocationFamily(mean = m1, sd = s1), 
+                                        list(m1 = robEst, s1 = sd))
+                    IC1 <- generateIC(neighbor = ContNeighborhood(radius = r), 
+                                      L2Fam = eval(L2Fam), 
+                                      res = list(A = as.matrix(A), a = 0, b = b, d = NULL, 
+                                          risk = list(asMSE = A, asBias = b, asCov = A-r^2*b^2), 
+                                          info = c("roblox", "optimally robust IC for AL estimators and 'asMSE'"),
+                                          w = w, biastype = symmetricBias(), normtype = NormType(),
+                                          modifyIC = modIC))
+                    Infos(IC1) <- matrix(c(rep("roblox", 3), 
+                                 paste("radius-minimax IC for contamination interval [", 
+                                   round(eps.lower, 3), ", ", round(eps.upper, 3), "]", sep = ""),
+                                 paste("least favorable contamination: ", round(r/sqrtn, 3), sep = ""),
+                                 paste("maximum MSE-inefficiency: ", round(ineff, 3), sep = "")), 
+                                 ncol = 2, dimnames = list(NULL, c("method", "message")))
+                    return(new("kStepEstimate", name = "Optimally robust estimate",
+                               estimate.call = es.call, estimate = robEst, 
+                               samplesize = length(x), asvar = as.matrix(A-r^2*b^2),
+                               asbias = r*b, steps = k, pIC = IC1, Infos = Info.matrix))
+                }else
+                    return(new("kStepEstimate", name = "Optimally robust estimate",
+                               estimate.call = es.call, estimate = robEst, 
+                               samplesize = length(x), asvar = as.matrix(A-r^2*b^2),
+                               asbias = r*b, steps = k, pIC = NULL, Infos = Info.matrix))
             }
         }
         if(missing(sd)){
-            if(initial.est == "ksMD"){
-                KSdist.sd <- function(sd, x, mean){
-                    return(ks.test(x, "pnorm", mean = mean, sd = sd)$statistic)
-                }
-                sd <- optimize(f = KSdist.sd, 
-                            interval = c(.Machine$double.eps^0.5, max(x)-min(x)), 
-                            tol = tol, x = x, mean = mean)$minimum
+            if(length(mean) != 1)
+                stop("mean has length != 1")
+            if(missing(initial.est)){ 
+                sd <- mad(x, na.rm = TRUE)
+                if(sd == 0)
+                  stop("'mad(x, na.rm = TRUE) == 0' => cannot compute a valid initial estimate, 
+                       please specify one via 'initial.est'")
+            }else{
+                if(!is.numeric(initial.est) || length(initial.est) != 1)
+                    stop("'initial.est' needs to be a numeric vector of length 1 or missing")
+                sd <- initial.est
+                if(initial.est <= 0)
+                  stop("'initial.est <= 0'; i.e., is no valid scale estimate")
             }
-            if(initial.est == "med") sd <- mad(x, na.rm = TRUE)
 
             if(!missing(eps)){
-                IC1 <- rsOptIC(r = sqrt(length(x))*eps, mean = mean, sd = sd, 
-                               bUp = bUp, delta = tol, itmax = itmax)
-                Infos(IC1) <- matrix(c("roblox", 
-                                       "optimally robust IC for AL estimators and 'asMSE'"), 
-                                     ncol = 2, dimnames = list(NULL, c("method", "message")))
-                robEst <- oneStepEstimator(x, IC1, sd)
-                if(returnIC)
-                    return(list(optIC = IC1, mean = mean, sd = robEst))
-                else
-                    return(list(mean = mean, sd = robEst))
+                r <- sqrt(length(x))*eps
+                if(r > 10){
+                    b <- sd/(4*qnorm(0.75)*dnorm(qnorm(0.75)))
+                    A <- b^2*(1+r^2)
+                    a <- (qnorm(0.75)^2 - 1)/sd*A
+                }else{
+                    A <- sd^2*.getA.sc(r)
+                    a <- sd*.geta.sc(r)
+                    b <- sd*.getb.sc(r)
+                }
+                robEst <- .kstep.sc(x = x, initial.est = sd, A = A, a = a, b = b, mean = mean, k = k)
+                names(robEst$est) <- "sd"
+                Info.matrix <- matrix(c("roblox", 
+                                        paste("optimally robust estimate for contamination 'eps' =", round(eps, 3),
+                                              "and 'asMSE'")),
+                                      ncol = 2, dimnames = list(NULL, c("method", "message")))
+                if(returnIC){
+                    w <- new("HampelWeight")
+                    clip(w) <- robEst$b
+                    cent(w) <- robEst$a/robEst$A
+                    stand(w) <- as.matrix(robEst$A)
+                    weight(w) <- getweight(w, neighbor = ContNeighborhood(radius = r), 
+                                       biastype = symmetricBias(), 
+                                       normW = NormType())
+                    modIC <- function(L2Fam, IC){
+                        ICL2Fam <- eval(CallL2Fam(IC))
+                        if(is(L2Fam, "L2ScaleFamily") && is(distribution(L2Fam), "Norm")){
+                            sdneu <- main(L2Fam)
+                            sdalt <- main(ICL2Fam)
+                            r <- neighborRadius(IC)
+                            w <- weight(IC)
+                            clip(w) <- sdneu*clip(w)/sdalt
+                            cent(w) <- sdalt*cent(w)/sdneu
+                            stand(w) <- sdneu^2*stand(w)/sdalt^2
+                            weight(w) <- getweight(w, neighbor = ContNeighborhood(radius = r), 
+                                          biastype = biastype(IC), 
+                                          normW = normtype(IC))
+                            A <- sdneu^2*stand(IC)/sdalt^2
+                            b <- sdneu*clip(IC)/sdalt
+                            res <- list(A = A, a = sdneu*cent(IC)/sdalt, b = b, d = NULL,
+                                        risk = list(asMSE = A, asBias = b, asCov = A-r^2*b^2), 
+                                        info = Infos(IC), w = w,
+                                        normtype = normtype(IC), biastype = biastype(IC),
+                                        modifyIC = modifyIC(IC))
+                            IC <- generateIC(neighbor = ContNeighborhood(radius = r),
+                                            L2Fam = L2Fam, res = res)
+                            addInfo(IC) <- c("modifyIC", "The IC has been modified")
+                            addInfo(IC) <- c("modifyIC", "The entries in 'Infos' may be wrong")
+                            return(IC)
+                        }else{
+                            makeIC(L2Fam, IC)
+                        }
+                    }
+                    L2Fam <- substitute(NormScaleFamily(mean = m1, sd = s1), 
+                                        list(m1 = mean, s1 = robEst$est))
+                    IC1 <- generateIC(neighbor = ContNeighborhood(radius = r), 
+                                      L2Fam = eval(L2Fam), 
+                                      res = list(A = as.matrix(robEst$A), a = robEst$a, b = robEst$b, d = NULL, 
+                                          risk = list(asMSE = robEst$A, asBias = robEst$b, 
+                                                      asCov = robEst$A-r^2*robEst$b^2), 
+                                          info = c("roblox", "optimally robust IC for AL estimators and 'asMSE'"),
+                                          w = w, biastype = symmetricBias(), normtype = NormType(),
+                                          modifyIC = modIC))
+                    return(new("kStepEstimate", name = "Optimally robust estimate",
+                               estimate.call = es.call, estimate = robEst$est, 
+                               samplesize = length(x), asvar = as.matrix(robEst$A-r^2*robEst$b^2),
+                               asbias = r*robEst$b, steps = k, pIC = IC1, Infos = Info.matrix))
+                }else
+                    return(new("kStepEstimate", name = "Optimally robust estimate",
+                               estimate.call = es.call, estimate = robEst$est, 
+                               samplesize = length(x), asvar = as.matrix(robEst$A-r^2*robEst$b^2),
+                               asbias = r*robEst$b, steps = k, pIC = NULL, Infos = Info.matrix))
             }else{
                 sqrtn <- sqrt(length(x))
                 rlo <- sqrtn*eps.lower
                 rup <- sqrtn*eps.upper
-                r <- uniroot(.getsInterval, lower = rlo+1e-5, upper = rup, 
-                         tol = .Machine$double.eps^0.25, rlo = rlo, rup = rup,
-                         mean = mean, sd = sd, delta = tol, bUp = bUp, 
-                         itmax = itmax)$root
-                IC1 <- rsOptIC(r = r, mean = mean, sd = sd, bUp = bUp, 
-                               delta = tol, itmax = itmax)
-                if(rlo == 0){
-                    ineff <- (as.vector(stand(IC1)) - clip(IC1)^2*r^2)/(0.5*sd^2)
+                if(rlo > 10){
+                    r <- (rlo+rup)/2
                 }else{
-                    Ablo <- rsOptIC(r = rlo, mean = mean, sd = sd, bUp = bUp, delta = tol, 
-                                    itmax = itmax, computeIC = FALSE)
-                    ineff <- (as.vector(stand(IC1)) - clip(IC1)^2*(r^2 - rlo^2))/Ablo$A
+                    r <- uniroot(.getsInterval, lower = rlo+1e-8, upper = rup, 
+                             tol = .Machine$double.eps^0.25, rlo = rlo, rup = rup)$root
                 }
-                Infos(IC1) <- matrix(c(rep("roblox", 3), 
-                             paste("radius-minimax IC for radius interval [", 
-                               round(rlo, 3), ", ", round(rup, 3), "]", sep = ""),
-                             paste("least favorable radius: ", round(r, 3), sep = ""),
-                             paste("maximum MSE-inefficiency: ", round(ineff, 3), sep = "")), 
-                             ncol = 2, dimnames = list(NULL, c("method", "message")))
-                robEst <- oneStepEstimator(x, IC1, sd)
-                if(returnIC)
-                    return(list(optIC = IC1, mean = mean, sd = robEst))
-                else
-                    return(list(mean = mean, sd = robEst))
+                if(r > 10){
+                    b <- sd/(4*qnorm(0.75)*dnorm(qnorm(0.75)))
+                    A <- b^2*(1+r^2)
+                    a <- (qnorm(0.75)^2 - 1)/sd*A
+                }else{
+                    A <- sd^2*.getA.sc(r)
+                    a <- sd*.geta.sc(r)
+                    b <- sd*.getb.sc(r)
+                }
+                if(rlo == 0){
+                    ineff <- (A - b^2*r^2)/(0.5*sd^2)
+                }else{
+                    if(rlo > 10){
+                        ineff <- 1
+                    }else{
+                        Alo <- sd^2*.getA.sc(rlo)
+                        ineff <- (A - b^2*(r^2 - rlo^2))/Alo
+                    }
+                }
+                robEst <- .kstep.sc(x = x, initial.est = sd, A = A, a = a, b = b, mean = mean, k = k)
+                names(robEst$est) <- "sd"
+                Info.matrix <- matrix(c(rep("roblox", 3), 
+                                      paste("radius-minimax estimate for contamination interval [", 
+                                        round(eps.lower, 3), ", ", round(eps.upper, 3), "]", sep = ""),
+                                      paste("least favorable contamination: ", round(r/sqrtn, 3), sep = ""),
+                                      paste("maximum MSE-inefficiency: ", round(ineff, 3), sep = "")), 
+                                      ncol = 2, dimnames = list(NULL, c("method", "message")))
+                if(returnIC){
+                    w <- new("HampelWeight")
+                    clip(w) <- robEst$b
+                    cent(w) <- robEst$a/robEst$A
+                    stand(w) <- as.matrix(robEst$A)
+                    weight(w) <- getweight(w, neighbor = ContNeighborhood(radius = r), 
+                                       biastype = symmetricBias(), 
+                                       normW = NormType())
+                    modIC <- function(L2Fam, IC){
+                        ICL2Fam <- eval(CallL2Fam(IC))
+                        if(is(L2Fam, "L2ScaleFamily") && is(distribution(L2Fam), "Norm")){
+                            sdneu <- main(L2Fam)
+                            sdalt <- main(ICL2Fam)
+                            r <- neighborRadius(IC)
+                            w <- weight(IC)
+                            clip(w) <- sdneu*clip(w)/sdalt
+                            cent(w) <- sdalt*cent(w)/sdneu
+                            stand(w) <- sdneu^2*stand(w)/sdalt^2
+                            weight(w) <- getweight(w, neighbor = ContNeighborhood(radius = r), 
+                                          biastype = biastype(IC), 
+                                          normW = normtype(IC))
+                            A <- sdneu^2*stand(IC)/sdalt^2
+                            b <- sdneu*clip(IC)/sdalt
+                            res <- list(A = A, a = sdneu*cent(IC)/sdalt, b = b, d = NULL,
+                                        risk = list(asMSE = A, asBias = b, asCov = A-r^2*b^2), 
+                                        info = Infos(IC), w = w,
+                                        normtype = normtype(IC), biastype = biastype(IC),
+                                        modifyIC = modifyIC(IC))
+                            IC <- generateIC(neighbor = ContNeighborhood(radius = r),
+                                            L2Fam = L2Fam, res = res)
+                            addInfo(IC) <- c("modifyIC", "The IC has been modified")
+                            addInfo(IC) <- c("modifyIC", "The entries in 'Infos' may be wrong")
+                            return(IC)
+                        }else{
+                            makeIC(L2Fam, IC)
+                        }
+                    }
+                    L2Fam <- substitute(NormScaleFamily(mean = m1, sd = s1), 
+                                        list(m1 = mean, s1 = robEst$est))
+                    IC1 <- generateIC(neighbor = ContNeighborhood(radius = r), 
+                                      L2Fam = eval(L2Fam), 
+                                      res = list(A = as.matrix(robEst$A), a = robEst$a, b = robEst$b, d = NULL, 
+                                          risk = list(asMSE = robEst$A, asBias = robEst$b, 
+                                                      asCov = robEst$A-r^2*robEst$b^2), 
+                                          info = c("roblox", "optimally robust IC for AL estimators and 'asMSE'"),
+                                          w = w, biastype = symmetricBias(), normtype = NormType(),
+                                          modifyIC = modIC))
+                    Infos(IC1) <- matrix(c(rep("roblox", 3), 
+                                 paste("radius-minimax IC for contamination interval [", 
+                                   round(eps.lower, 3), ", ", round(eps.upper, 3), "]", sep = ""),
+                                 paste("least favorable contamination: ", round(r/sqrtn, 3), sep = ""),
+                                 paste("maximum MSE-inefficiency: ", round(ineff, 3), sep = "")), 
+                                 ncol = 2, dimnames = list(NULL, c("method", "message")))
+                    return(new("kStepEstimate", name = "Optimally robust estimate",
+                               estimate.call = es.call, estimate = robEst$est, 
+                               samplesize = length(x), asvar = as.matrix(robEst$A-r^2*robEst$b^2),
+                               asbias = r*robEst$b, steps = k, pIC = IC1, Infos = Info.matrix))
+                }else
+                    return(new("kStepEstimate", name = "Optimally robust estimate",
+                               estimate.call = es.call, estimate = robEst$est, 
+                               samplesize = length(x), asvar = as.matrix(robEst$A-r^2*robEst$b^2),
+                               asbias = r*robEst$b, steps = k, pIC = NULL, Infos = Info.matrix))
             }
         }
     }
-}   
+}
