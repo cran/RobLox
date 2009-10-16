@@ -71,7 +71,8 @@
 ###############################################################################
 ## Evaluate roblox on rows of a matrix
 ###############################################################################
-rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1){
+rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, 
+                      k = 1L, fsCor = TRUE, mad0 = 1e-4, na.rm = TRUE){
     es.call <- match.call()
     if(missing(x))
         stop("'x' is missing with no default")
@@ -83,6 +84,72 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
         stop("'x' has to be a matrix resp. convertable to a matrix by 'as.matrix'
               or 'data.matrix'")
 
+    completecases <- complete.cases(x)
+    if(na.rm) x <- na.omit(x)
+
+    if(ncol(x) <= 2){
+        if(missing(mean) && missing(sd)){
+            warning("Sample size <= 2! => Median and MAD are used for estimation.")
+            if(require(Biobase)){
+                mean <- rowMedians(x, na.rm = TRUE)
+                sd <- rowMedians(abs(x-mean), na.rm = TRUE)/qnorm(0.75)
+            }else{
+                warning("You can speed up the computations by installing Bioconductor package 'Biobase'!")
+                mean <- apply(x, 1, median, na.rm = TRUE)
+                sd <- apply(abs(x-mean), 1, median, na.rm = TRUE)/qnorm(0.75)
+            }            
+            robEst <- cbind(mean, sd)
+            colnames(robEst) <- c("mean", "sd")
+            Info.matrix <- matrix(c("rowRoblox", 
+                                  paste("median and MAD")),
+                                  ncol = 2, dimnames = list(NULL, c("method", "message")))
+            return(new("ALEstimate", name = "Median and MAD", 
+                       completecases = completecases,
+                       estimate.call = es.call, estimate = robEst,
+                       samplesize = ncol(x), asvar = NULL,
+                       asbias = NULL, pIC = NULL, Infos = Info.matrix))
+        }
+        if(missing(mean)){
+            warning("Sample size <= 2! => Median is used for estimation.")
+            if(require(Biobase)){
+                mean <- rowMedians(x, na.rm = TRUE)
+            }else{
+                warning("You can speed up the computations by installing Bioconductor package 'Biobase'!")
+                mean <- apply(x, 1, median, na.rm = TRUE)
+            }
+            robEst <- matrix(mean)
+            colnames(robEst) <- "mean"
+            Info.matrix <- matrix(c("rowRoblox", 
+                                  paste("median")),
+                                  ncol = 2, dimnames = list(NULL, c("method", "message")))
+            return(new("ALEstimate", name = "Median", 
+                       completecases = completecases,
+                       estimate.call = es.call, estimate = robEst,
+                       samplesize = ncol(x), asvar = NULL,
+                       asbias = NULL, pIC = NULL, Infos = Info.matrix))
+        }
+        if(missing(sd)){
+            warning("Sample size <= 2! => MAD is used for estimation.")
+            if(!is.numeric(mean) || (length(mean) != 1 && length(mean) != nrow(x)))
+                stop("'mean' has wrong dimension")
+            if(require(Biobase)){
+                sd <- rowMedians(abs(x-mean), na.rm = TRUE)/qnorm(0.75)
+            }else{
+                warning("You can speed up the computations by installing Bioconductor package 'Biobase'!")
+                sd <- apply(abs(x-mean), 1, median, na.rm = TRUE)/qnorm(0.75)
+            }
+            robEst <- matrix(sd)
+            colnames(robEst) <- "sd"
+            Info.matrix <- matrix(c("rowRoblox", 
+                                  paste("MAD")),
+                                  ncol = 2, dimnames = list(NULL, c("method", "message")))
+            return(new("ALEstimate", name = "MAD", 
+                       completecases = completecases,
+                       estimate.call = es.call, estimate = robEst,
+                       samplesize = ncol(x), asvar = NULL,
+                       asbias = NULL, pIC = NULL, Infos = Info.matrix))
+        }
+    }
     if(missing(eps) && missing(eps.lower) && missing(eps.upper)){
         eps.lower <- 0
         eps.upper <- 0.5
@@ -101,16 +168,64 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
     }else{
         if(length(eps) != 1)
             stop("'eps' has to be of length 1")
-        if(eps == 0)
-            stop("'eps = 0'! => use functions 'mean' and 'sd' for estimation")
         if((eps < 0) || (eps > 0.5))
             stop("'eps' has to be in (0, 0.5]")
+        if(eps == 0){
+            if(missing(mean) && missing(sd)){
+                warning("eps = 0! => Mean and sd are used for estimation.")
+                mean <- rowMeans(x, na.rm = TRUE)
+                n <- rowSums(!is.na(x))
+                n[n < 1] <- NA
+                sd <- rowSums((x - mean)^2, na.rm = TRUE)/n
+                robEst <- cbind(mean, sd)
+
+                colnames(robEst) <- c("mean", "sd")
+                Info.matrix <- matrix(c("rowRoblox", 
+                                      paste("mean and sd")),
+                                      ncol = 2, dimnames = list(NULL, c("method", "message")))
+                return(new("ALEstimate", name = "Mean and sd", 
+                       completecases = completecases,
+                          estimate.call = es.call, estimate = robEst,
+                          samplesize = n, asvar = NULL,
+                          asbias = NULL, pIC = NULL, Infos = Info.matrix))
+            }
+            if(missing(mean)){
+                warning("eps = 0! => Mean is used for estimation.")
+                robEst <- matrix(rowMeans(x, na.rm = TRUE))
+                colnames(robEst) <- "mean"
+                Info.matrix <- matrix(c("rowRoblox", 
+                                      paste("mean")),
+                                      ncol = 2, dimnames = list(NULL, c("method", "message")))
+                return(new("ALEstimate", name = "Mean", 
+                       completecases = completecases,
+                          estimate.call = es.call, estimate = robEst,
+                          samplesize = length(x), asvar = NULL,
+                          asbias = NULL, pIC = NULL, Infos = Info.matrix))
+            }
+            if(missing(sd)){
+                warning("eps = 0! => sd is used for estimation.")
+                if(!is.numeric(mean) || (length(mean) != 1 && length(mean) != nrow(x)))
+                    stop("'mean' has wrong dimension")
+                n <- rowSums(!is.na(x))
+                n[n < 1] <- NA
+                robEst <- matrix(rowSums((x - mean)^2, na.rm = TRUE)/n)
+                colnames(robEst) <- "sd"
+                Info.matrix <- matrix(c("rowRoblox", 
+                                      paste("sd")),
+                                      ncol = 2, dimnames = list(NULL, c("method", "message")))
+                return(new("ALEstimate", name = "sd", 
+                       completecases = completecases,
+                          estimate.call = es.call, estimate = robEst,
+                          samplesize = n, asvar = NULL,
+                          asbias = NULL, pIC = NULL, Infos = Info.matrix))
+            }
+        }
     }
     if(k < 1){
-      stop("'k' has to be some positive integer value")
+        stop("'k' has to be some positive integer value")
     }
     if(length(k) != 1){
-      stop("'k' has to be of length 1")
+        stop("'k' has to be of length 1")
     }
     k <- as.integer(k)
 
@@ -120,23 +235,31 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
                 mean <- rowMedians(x, na.rm = TRUE)
                 sd <- rowMedians(abs(x-mean), na.rm = TRUE)/qnorm(0.75)
             }else{
+                warning("You can speed up the computations by installing Bioconductor package 'Biobase'!")
                 mean <- apply(x, 1, median, na.rm = TRUE)
                 sd <- apply(abs(x-mean), 1, median, na.rm = TRUE)/qnorm(0.75)
             }
-            if(any(sd == 0))
-                stop("'mad(x, na.rm = TRUE) == 0' => cannot compute a valid initial estimate, 
-                      please specify one via 'initial.est'")
+            if(any(sd == 0)){
+                stop("'mad(x, na.rm = TRUE) = 0' for some samples => cannot compute a valid initial estimate.
+                      To avoid division by zero 'mad0' is used. You could also specify 
+                      a valid scale estimate via 'initial.est'. Note that you have to provide
+                      a location and scale estimate.")
+                sd[sd == 0] <- mad0
+            }
+            mean.sd <- cbind(mean=mean,sd=sd)
         }else{
             if(nrow(initial.est) != nrow(x) || ncol(initial.est) != 2)
-              stop("'initial.est' has wrong dimension")
+                stop("'initial.est' has wrong dimension")
             mean <- initial.est[,1]
             sd <- initial.est[,2]
             if(any(sd <= 0))
                 stop("initial estimate for scale <= 0 which is no valid scale estimate")
+            mean.sd <- initial.est
         }
 
         if(!missing(eps)){
             r <- sqrt(ncol(x))*eps
+            if(fsCor) r <- finiteSampleCorrection(r = r, n = ncol(x), model = "locsc")
             if(r > 10){
                 b <- sd*1.618128043
                 const <- 1.263094656
@@ -159,9 +282,11 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
                                           "and 'asMSE'")),
                                   ncol = 2, dimnames = list(NULL, c("method", "message")))
             return(new("kStepEstimate", name = "Optimally robust estimate",
-                       estimate.call = es.call, estimate = robEst$est, 
+                       completecases = completecases,
+                       estimate.call = es.call, estimate = robEst$est,
                        samplesize = ncol(x), steps = k, 
-                       pIC = NULL, Infos = Info.matrix))
+                       pIC = NULL, Infos = Info.matrix,
+                       start = mean.sd, startval = mean.sd, ustartval = mean.sd))
 ## we need a class like "list of estimates" to set asvar and asbias consistently ...
 #            return(new("kStepEstimate", name = "Optimally robust estimate",
 #                       estimate = robEst$est, samplesize = ncol(x), asvar = NULL, 
@@ -176,6 +301,7 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
                 r <- uniroot(.getlsInterval, lower = rlo+1e-8, upper = rup, 
                              tol = .Machine$double.eps^0.25, rlo = rlo, rup = rup)$root
             }
+            if(fsCor) r <- finiteSampleCorrection(r = r, n = ncol(x), model = "locsc")
             if(r > 10){
                 b <- sd*1.618128043
                 const <- 1.263094656
@@ -211,9 +337,11 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
                                   paste("maximum MSE-inefficiency: ", round(ineff[1], 3), sep = "")), 
                                   ncol = 2, dimnames = list(NULL, c("method", "message")))
             return(new("kStepEstimate", name = "Optimally robust estimate",
+                       completecases = completecases,
                        estimate.call = es.call, estimate = robEst$est, #
                        samplesize = ncol(x), steps = k, 
-                       pIC = NULL, Infos = Info.matrix))
+                       pIC = NULL, Infos = Info.matrix,
+                       start = mean.sd, startval = mean.sd, ustartval = mean.sd))
 ## we need a class like "list of estimates" to set asvar and asbias consistently ...
 #            return(new("kStepEstimate", name = "Optimally robust estimate",
 #                       estimate = robEst$est, samplesize = ncol(x), asvar = NULL, 
@@ -229,6 +357,7 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
                 if(require(Biobase)){
                     mean <- rowMedians(x, na.rm = TRUE)
                 }else{
+                    warning("You can speed up the computations by installing Bioconductor package 'Biobase'!")
                     mean <- apply(x, 1, median, na.rm = TRUE)
                 }
             }else{
@@ -239,8 +368,11 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
             if(length(sd) == 1)
                 sd <- rep(sd, length(mean))
 
+            mean.sd <- cbind(mean=mean,sd=sd)
+
             if(!missing(eps)){
                 r <- sqrt(ncol(x))*eps
+                if(fsCor) r <- finiteSampleCorrection(r = r, n = ncol(x), model = "loc")
                 if(r > 10){
                     b <- sd*sqrt(pi/2)
                     A <- b^2*(1+r^2)
@@ -255,9 +387,11 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
                                               "and 'asMSE'")),
                                       ncol = 2, dimnames = list(NULL, c("method", "message")))
                 return(new("kStepEstimate", name = "Optimally robust estimate",
-                           estimate.call = es.call, estimate = robEst, 
+                       completecases = completecases,
+                           estimate.call = es.call, estimate = robEst,
                            samplesize = ncol(x), steps = k, 
-                           pIC = NULL, Infos = Info.matrix))
+                           pIC = NULL, Infos = Info.matrix,
+                       start = mean.sd[,1,drop=F], startval = mean.sd[,1,drop=F], ustartval = mean.sd))
 ## we need a class like "list of estimates" to set asvar and asbias consistently ...
 #                return(new("kStepEstimate", name = "Optimally robust estimate",
 #                           estimate = robEst$est, samplesize = ncol(x), asvar = as.matrix(A - r^2*b^2), 
@@ -272,6 +406,7 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
                     r <- uniroot(.getlInterval, lower = rlo+1e-8, upper = rup, 
                                  tol = .Machine$double.eps^0.25, rlo = rlo, rup = rup)$root
                 }
+                if(fsCor) r <- finiteSampleCorrection(r = r, n = ncol(x), model = "loc")
                 if(r > 10){
                     b <- sd*sqrt(pi/2)
                     A <- b^2*(1+r^2)
@@ -298,9 +433,11 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
                                       paste("maximum MSE-inefficiency: ", round(ineff[1], 3), sep = "")), 
                                       ncol = 2, dimnames = list(NULL, c("method", "message")))
                 return(new("kStepEstimate", name = "Optimally robust estimate",
-                           estimate.call = es.call, estimate = robEst, 
+                       completecases = completecases,
+                           estimate.call = es.call, estimate = robEst,
                            samplesize = ncol(x), steps = k, 
-                           pIC = NULL, Infos = Info.matrix))
+                           pIC = NULL, Infos = Info.matrix,
+                       start = mean.sd[,1,drop=F], startval = mean.sd[,1,drop=F], ustartval = mean.sd))
 ## we need a class like "list of estimates" to set asvar and asbias consistently ...
 #                return(new("kStepEstimate", name = "Optimally robust estimate",
 #                           estimate = robEst$est, samplesize = ncol(x), asvar = as.matrix(A - r^2*b^2), 
@@ -312,24 +449,30 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
                 stop("'mean' has wrong dimension")
             if(missing(initial.est)){
                 if(require(Biobase)){
-                    M <- rowMedians(x, na.rm = TRUE)
-                    sd <- rowMedians(abs(x-M), na.rm = TRUE)/qnorm(0.75)
+                    sd <- rowMedians(abs(x-mean), na.rm = TRUE)/qnorm(0.75)
                 }else{
-                    sd <- apply(x, 1, mad, na.rm = TRUE)
+                    warning("You can speed up the computations by installing Bioconductor package 'Biobase'!")
+                    sd <- apply(abs(x-mean), 1, median, na.rm = TRUE)/qnorm(0.75)
                 }
-                if(any(sd == 0))
-                  stop("'mad(x, na.rm = TRUE) == 0' => cannot compute a valid initial estimate, 
-                       please specify one via 'initial.est'")
+                if(any(sd == 0)){
+                    stop("'mad(x, na.rm = TRUE) = 0' for some samples => cannot compute a valid initial estimate.
+                          To avoid division by zero 'mad0' is used. You could also specify 
+                          a valid scale estimate via 'initial.est'.")
+                    sd[sd == 0] <- mad0
+                }
             }else{
                 if(!is.numeric(initial.est) || length(initial.est) != nrow(x))
                     stop("'initial.est' has wrong dimension")
-                sd <- initial.est
                 if(any(initial.est <= 0))
-                  stop("'initial.est <= 0'; i.e., is no valid scale estimate")
+                    stop("'initial.est <= 0'; i.e., is no valid scale estimate")
+                sd <- initial.est
             }
+
+            mean.sd <- cbind(mean=mean,sd=sd)
 
             if(!missing(eps)){
                 r <- sqrt(ncol(x))*eps
+                if(fsCor) r <- finiteSampleCorrection(r = r, n = ncol(x), model = "sc")
                 if(r > 10){
                     b <- sd/(4*qnorm(0.75)*dnorm(qnorm(0.75)))
                     A <- b^2*(1+r^2)
@@ -347,9 +490,11 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
                                               "and 'asMSE'")),
                                       ncol = 2, dimnames = list(NULL, c("method", "message")))
                 return(new("kStepEstimate", name = "Optimally robust estimate",
-                           estimate.call = es.call, estimate = robEst$est, 
+                       completecases = completecases,
+                           estimate.call = es.call, estimate = robEst$est,
                            samplesize = ncol(x), steps = k, 
-                           pIC = NULL, Infos = Info.matrix))
+                           pIC = NULL, Infos = Info.matrix,
+                       start = mean.sd[,2,drop=F], startval = mean.sd[,2,drop=F], ustartval = mean.sd))
 ## we need a class like "list of estimates" to set asvar and asbias consistently ...
 #                return(new("kStepEstimate", name = "Optimally robust estimate",
 #                           estimate = robEst$est, samplesize = ncol(x), asvar = as.matrix(robEst$A - r^2*robEst$b^2), 
@@ -364,6 +509,7 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
                     r <- uniroot(.getsInterval, lower = rlo+1e-8, upper = rup, 
                              tol = .Machine$double.eps^0.25, rlo = rlo, rup = rup)$root
                 }
+                if(fsCor) r <- finiteSampleCorrection(r = r, n = ncol(x), model = "sc")
                 if(r > 10){
                     b <- sd/(4*qnorm(0.75)*dnorm(qnorm(0.75)))
                     A <- b^2*(1+r^2)
@@ -393,9 +539,12 @@ rowRoblox <- function(x, mean, sd, eps, eps.lower, eps.upper, initial.est, k = 1
                                       paste("maximum MSE-inefficiency: ", round(ineff[1], 3), sep = "")), 
                                       ncol = 2, dimnames = list(NULL, c("method", "message")))
                 return(new("kStepEstimate", name = "Optimally robust estimate",
-                           estimate.call = es.call, estimate = robEst$est, 
+                       completecases = completecases,
+                           estimate.call = es.call, estimate = robEst$est,
                            samplesize = ncol(x), steps = k, 
-                           pIC = NULL, Infos = Info.matrix))
+                           pIC = NULL, Infos = Info.matrix,
+                       start = mean.sd[,2,drop=F], startval = mean.sd[,2,drop=F],
+                       ustartval = mean.sd))
 ## we need a class like "list of estimates" to set asvar and asbias consistently ...
 #                return(new("kStepEstimate", name = "Optimally robust estimate",
 #                           estimate = robEst$est, samplesize = ncol(x), asvar = as.matrix(robEst$A - r^2*robEst$b^2), 
