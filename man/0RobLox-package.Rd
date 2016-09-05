@@ -12,16 +12,15 @@ estimators in case of normal location and/or scale.
 \details{
 \tabular{ll}{
 Package: \tab RobLox \cr
-Version: \tab 0.9 \cr
-Date: \tab 2013-09-12 \cr
-Depends: \tab R(>= 2.7.0), stats, lattice, RColorBrewer, RandVar, Biobase, distr, distrMod,
-RobAStBase \cr
+Version: \tab 1.0 \cr
+Date: \tab 2015-09-05 \cr
+Depends: \tab R(>= 2.14.0), methods, distrMod(>= 2.5.2), RobAStBase(>= 0.9) \cr
+Imports: \tab stats, lattice, RColorBrewer, Biobase, RandVar(>= 0.9.2), distr(>= 2.5.2) \cr
 Suggests: \tab MASS\cr
-LazyLoad: \tab yes \cr
 ByteCompile: \tab yes \cr
 License: \tab LGPL-3 \cr
 URL: \tab http://robast.r-forge.r-project.org/\cr
-SVNRevision: \tab 696 \cr
+SVNRevision: \tab -Inf \cr
 }
 }
 \author{Matthias Kohl  \email{matthias.kohl@stamats.de}}

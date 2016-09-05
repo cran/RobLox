@@ -8,10 +8,19 @@
  information)
 
 #######################################
-version 0.9
+version 1.0
 #######################################
 
 user-visible CHANGES:
++ title changed to title style / capitalization
++ moved package stats to imports and added some new import directives to the
+  NAMESPACE file
++ added package methods to depends
+
+
+#######################################
+version 0.9
+#######################################
 
 GENERAL ENHANCEMENTS:
 + cleaned DESCRIPTION and NAMESPACE file as to Imports/Depends
